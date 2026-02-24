@@ -1,0 +1,35 @@
+name: 🎯 Trend & Sound Hunter — Daily Digest
+
+on:
+  # Каждый день в 09:00 по Москве (06:00 UTC)
+  schedule:
+    - cron: "0 6 * * *"
+
+  # Ручной запуск через кнопку на GitHub (для теста)
+  workflow_dispatch:
+
+jobs:
+  hunt:
+    name: Hunt Trends & Send to Telegram
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install cryptography
+
+      - name: Run Trend Hunter Bot
+        env:
+          TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_SA_JSON:    ${{ secrets.GOOGLE_SA_JSON }}
+        run: python bot.py
