@@ -107,6 +107,11 @@ def claude(messages, max_tokens=1200, use_search=False):
 
 # ─── ПОИСК ТРЕНДОВ ────────────────────────────────────────────────────────────
 
+def make_search_url(trend_name: str) -> str:
+    """Создаём ссылку на поиск тренда в TikTok."""
+    query = urllib.parse.quote(trend_name)
+    return f"https://www.tiktok.com/search?q={query}"
+
 def fetch_trends():
     log.info("Ищу свежие тренды...")
     moscow = datetime.now(timezone(timedelta(hours=3)))
@@ -115,28 +120,24 @@ def fetch_trends():
     raw = claude([{"role":"user","content":
         f"Today is {today}. Use web search to find 3 BRAND NEW emerging TikTok and Instagram Reels "
         f"trends from the LAST 7 DAYS that are just starting to go viral globally (not in Russia). "
-        f"For each trend you MUST find one real working video URL example "
-        f"(from tiktok.com, instagram.com, or youtube.com/shorts).\n\n"
-        f"Reply ONLY in this exact format, nothing else:\n\n"
+        f"Focus on trends that are at early stage — not yet mainstream.\n\n"
+        f"Reply ONLY in this exact format:\n\n"
         f"===TREND1===\n"
-        f"NAME: [trend name in Russian]\n"
+        f"NAME: [trend name — the exact hashtag or sound name people search for]\n"
         f"WHAT: [what people film — 2 sentences in Russian]\n"
-        f"AUDIO: [song/sound used]\n"
-        f"VIRAL: [why it spreads — 1 sentence in Russian]\n"
-        f"URL: [real video link]\n\n"
+        f"AUDIO: [exact song/sound name used]\n"
+        f"VIRAL: [why it spreads — 1 sentence in Russian]\n\n"
         f"===TREND2===\n"
         f"NAME: ...\n"
         f"WHAT: ...\n"
         f"AUDIO: ...\n"
-        f"VIRAL: ...\n"
-        f"URL: ...\n\n"
+        f"VIRAL: ...\n\n"
         f"===TREND3===\n"
         f"NAME: ...\n"
         f"WHAT: ...\n"
         f"AUDIO: ...\n"
-        f"VIRAL: ...\n"
-        f"URL: ..."
-    }], max_tokens=900, use_search=True)
+        f"VIRAL: ..."
+    }], max_tokens=800, use_search=True)
     return raw
 
 # ─── РЕЦЕПТЫ ─────────────────────────────────────────────────────────────────
@@ -244,14 +245,17 @@ def build_trends_section(trends):
         viral = clean(t.get("VIRAL",""))
         url   = t.get("URL","").strip()
 
+        # Генерируем ссылку на поиск в TikTok по названию тренда
+        search_query = urllib.parse.quote(name)
+        tiktok_url = f"https://www.tiktok.com/search?q={search_query}"
+        yt_url = f"https://www.youtube.com/results?search_query={search_query}+trend+2026"
+
         s = f"<b>{i}. {name}</b>\n"
         if what:  s += f"📹 {what}\n"
         if audio: s += f"🎵 <i>{audio}</i>\n"
         if viral: s += f"⚡ {viral}\n"
-        if url and url.startswith("http"):
-            s += f'🔗 <a href="{url}">Смотреть пример видео →</a>'
-        else:
-            s += "🔗 ссылка не найдена"
+        s += f'🔍 <a href="{tiktok_url}">Искать в TikTok →</a>  '
+        s += f'<a href="{yt_url}">YouTube →</a>'
         parts.append(s)
     return "\n\n".join(parts)
 
