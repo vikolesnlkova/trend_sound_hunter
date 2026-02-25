@@ -81,11 +81,20 @@ def _post(url, payload, headers):
     data = json.dumps(payload).encode()
     req  = urllib.request.Request(url, data=data,
            headers={"Content-Type":"application/json", **headers})
-    try:
-        with urllib.request.urlopen(req, timeout=120) as r:
-            return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"HTTP {e.code}: {e.read().decode()}") from e
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode()
+            # 529 = перегрузка, 529/rate limit — ждём и повторяем
+            if e.code in (529, 429) and attempt < 4:
+                wait = 30 * (attempt + 1)
+                log.warning(f"HTTP {e.code}, жду {wait}с (попытка {attempt+1}/5)...")
+                time.sleep(wait)
+                continue
+            raise RuntimeError(f"HTTP {e.code}: {body}") from e
+    raise RuntimeError("Все попытки исчерпаны")
 
 def claude(messages, max_tokens=1200, use_search=False):
     payload = {"model":"claude-haiku-4-5-20251001",
