@@ -156,10 +156,10 @@ def find_trends() -> str:
 def generate_recipes(tracks: list[dict], trends: str) -> str:
     log.info("Генерирую рецепты...")
 
-    # Берём до 4 треков, только первые 4 колонки
+    # Берём до 3 треков, только первые 3 колонки (экономим токены)
     tracks_text = ""
-    for i, t in enumerate(tracks[:4], 1):
-        vals = list(t.values())[:4]
+    for i, t in enumerate(tracks[:3], 1):
+        vals = list(t.values())[:3]
         tracks_text += f"{i}. {' | '.join(v for v in vals if v)}\n"
 
     prompt = f"""Ты — Trend & Sound Hunter для певицы Насти Арека (Green Touch, travel-блогер, Сеул).
@@ -178,9 +178,9 @@ def generate_recipes(tracks: list[dict], trends: str) -> str:
 
 Кратко и конкретно."""
 
-    # Пауза между запросами чтобы не превысить rate limit
-    time.sleep(15)
-    return claude([{"role": "user", "content": prompt}], max_tokens=1000)
+    # Ждём новую минуту — лимит 30k токенов/мин сбрасывается
+    time.sleep(62)
+    return claude([{"role": "user", "content": prompt}], max_tokens=800)
 
 # ─── TELEGRAM ─────────────────────────────────────────────────────────────────
 
