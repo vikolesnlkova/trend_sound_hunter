@@ -141,14 +141,16 @@ def find_trends() -> str:
     log.info("Ищу тренды...")
     moscow = datetime.now(timezone(timedelta(hours=3)))
     today = moscow.strftime("%d %B %Y")
+    # Без web_search — избегаем превышения rate limit
     return claude([{
         "role": "user",
         "content": (
-            f"Найди 3 актуальных тренда в Instagram Reels и TikTok на {today}. "
-            "Для каждого: название, формат видео, какой ритм/темп подходит, почему вирусно. "
-            "Пиши по-русски, кратко — не более 3 предложений на тренд."
+            f"Сегодня {today}. Назови 3 актуальных формата коротких видео "
+            "которые сейчас вирусны в Instagram Reels и TikTok. "
+            "Для каждого: название формата, что снимают, почему залетает. "
+            "По-русски, 2-3 предложения на формат."
         )
-    }], max_tokens=700, use_search=True)
+    }], max_tokens=600, use_search=False)
 
 
 def generate_recipes(tracks: list[dict], trends: str) -> str:
