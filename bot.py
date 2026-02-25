@@ -172,17 +172,56 @@ def make_recipes(tracks, trends_raw):
 
 def parse_trends(raw):
     trends = []
-    for block in re.split(r'===TREND\d+===', raw):
-        block = block.strip()
-        if not block:
+    # Пробуем строгий формат ===TREND1===
+    blocks = re.split(r'===TREND\d+===', raw)
+    if len(blocks) > 1:
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            t = {}
+            for line in block.splitlines():
+                for key in ["NAME","WHAT","AUDIO","VIRAL","URL"]:
+                    if line.startswith(f"{key}:"):
+                        t[key] = line[len(key)+1:].strip()
+            if t.get("NAME"):
+                trends.append(t)
+        if trends:
+            return trends[:3]
+
+    # Fallback: ищем URL-ы в тексте и разбиваем на блоки по нумерации
+    lines = raw.splitlines()
+    current = {}
+    for line in lines:
+        line = line.strip()
+        if not line:
             continue
-        t = {}
-        for line in block.splitlines():
-            for key in ["NAME","WHAT","AUDIO","VIRAL","URL"]:
-                if line.startswith(f"{key}:"):
-                    t[key] = line[len(key)+1:].strip()
-        if t.get("NAME"):
-            trends.append(t)
+        # Новый тренд начинается с цифры или заголовка
+        if re.match(r'^(#{1,3}\s*)?\d+[\.\)]', line) or re.match(r'^(#{1,3}\s*)(Тренд|Trend)', line, re.I):
+            if current.get("NAME"):
+                trends.append(current)
+            name = re.sub(r'^[#\d\.\)\s]+', '', line).strip()
+            current = {"NAME": name}
+        elif any(kw in line.lower() for kw in ["снимают","filming","видео","формат","what"]):
+            current["WHAT"] = re.sub(r'^[*_•\-]+\s*', '', line)
+        elif any(kw in line.lower() for kw in ["аудио","audio","музык","song","sound","трек"]):
+            current["AUDIO"] = re.sub(r'^[*_•\-]+\s*', '', line)
+        elif any(kw in line.lower() for kw in ["вирус","viral","почему","залет","spread"]):
+            current["VIRAL"] = re.sub(r'^[*_•\-]+\s*', '', line)
+        elif re.search(r'https?://', line):
+            url_match = re.search(r'https?://\S+', line)
+            if url_match:
+                current["URL"] = url_match.group(0).rstrip(')')
+        elif current.get("NAME") and not current.get("WHAT") and len(line) > 20:
+            current["WHAT"] = re.sub(r'^[*_•\-]+\s*', '', line)
+
+    if current.get("NAME"):
+        trends.append(current)
+
+    # Если совсем ничего не нашли — кладём весь текст как один блок
+    if not trends and raw.strip():
+        trends = [{"NAME": "Актуальные тренды", "WHAT": raw[:400]}]
+
     return trends[:3]
 
 def clean(text):
