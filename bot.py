@@ -137,50 +137,51 @@ def claude(messages: list, max_tokens: int = 2000, use_search: bool = False) -> 
     return "".join(b.get("text", "") for b in result.get("content", []) if b.get("type") == "text")
 
 
-def find_trends() -> str:
-    log.info("Ищу тренды...")
+def find_trends_and_recipes(tracks: list[dict]) -> tuple[str, str]:
+    """Один запрос — тренды + рецепты. Экономим токены и избегаем rate limit."""
+    log.info("Генерирую тренды и рецепты одним запросом...")
     moscow = datetime.now(timezone(timedelta(hours=3)))
     today = moscow.strftime("%d %B %Y")
-    # Без web_search — избегаем превышения rate limit
-    return claude([{
-        "role": "user",
-        "content": (
-            f"Сегодня {today}. Назови 3 актуальных формата коротких видео "
-            "которые сейчас вирусны в Instagram Reels и TikTok. "
-            "Для каждого: название формата, что снимают, почему залетает. "
-            "По-русски, 2-3 предложения на формат."
-        )
-    }], max_tokens=600, use_search=False)
 
-
-def generate_recipes(tracks: list[dict], trends: str) -> str:
-    log.info("Генерирую рецепты...")
-
-    # Берём до 3 треков, только первые 3 колонки (экономим токены)
     tracks_text = ""
     for i, t in enumerate(tracks[:3], 1):
         vals = list(t.values())[:3]
         tracks_text += f"{i}. {' | '.join(v for v in vals if v)}\n"
 
-    prompt = f"""Ты — Trend & Sound Hunter для певицы Насти Арека (Green Touch, travel-блогер, Сеул).
+    prompt = f"""Сегодня {today}. Ты — Trend & Sound Hunter для певицы Насти Арека (студия Green Touch, travel-блогер, влог из Сеула).
 
-ТРЕНДЫ:
-{trends}
-
-ТРЕКИ:
+ТРЕКИ НАСТИ:
 {tracks_text}
 
-Дай 2 рецепта (трек + тренд). Для каждого — 4 пункта:
+Задача: напиши дайджест в двух частях.
+
+ЧАСТЬ 1 — ТРЕНДЫ (заголовок: "🌍 ТРЕНДЫ ДНЯ")
+3 актуальных вирусных формата в Instagram Reels и TikTok.
+Для каждого: название, что снимают, почему залетает. По 2 предложения.
+
+ЧАСТЬ 2 — РЕЦЕПТЫ (заголовок: "✨ РЕЦЕПТЫ")
+2 рецепта: каждый = 1 трек Насти + 1 тренд из части 1.
+Для каждого рецепта:
 🎬 Сценарий (15-30 сек)
 🎵 Как использовать трек
 🌿 Эстетика Насти
 📍 Хэштеги и время постинга
 
-Кратко и конкретно."""
+Пиши по-русски, конкретно и коротко."""
 
-    # Ждём новую минуту — лимит 30k токенов/мин сбрасывается
-    time.sleep(62)
-    return claude([{"role": "user", "content": prompt}], max_tokens=800)
+    result = claude([{"role": "user", "content": prompt}], max_tokens=1200)
+
+    # Делим ответ на две части по заголовкам
+    if "✨ РЕЦЕПТЫ" in result:
+        parts = result.split("✨ РЕЦЕПТЫ", 1)
+        trends_part = parts[0].replace("🌍 ТРЕНДЫ ДНЯ", "").strip()
+        recipes_part = parts[1].strip()
+    else:
+        # Если модель не разделила — отдаём всё как рецепты
+        trends_part = "Тренды включены в рецепты ниже."
+        recipes_part = result.strip()
+
+    return trends_part, recipes_part
 
 # ─── TELEGRAM ─────────────────────────────────────────────────────────────────
 
@@ -247,9 +248,8 @@ def main():
             send("⚠️ Треки не найдены в Google Sheets. Проверь таблицу.")
             return
 
-        # 3. Тренды + рецепты
-        trends  = find_trends()
-        recipes = generate_recipes(tracks, trends)
+        # 3. Тренды + рецепты — одним запросом
+        trends, recipes = find_trends_and_recipes(tracks)
 
         # 4. Отправляем
         msg = format_message(trends, recipes, len(tracks))
